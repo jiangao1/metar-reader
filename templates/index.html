@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>METAR Weather Reader</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #6b48ff 0%, #a78bfa 50%, #7c3aed 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 40px 16px 60px;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 18px;
+      width: 100%;
+      max-width: 760px;
+      padding: 40px 44px 48px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+    }
+
+    /* ── Search area ── */
+    .search-area { margin-bottom: 32px; }
+
+    .search-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    #airport-input {
+      flex: 1;
+      padding: 12px 16px;
+      font-size: 1rem;
+      font-weight: 600;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      border: 2px solid #d1d5db;
+      border-radius: 10px;
+      color: #111827;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    #airport-input::placeholder {
+      font-weight: 400;
+      letter-spacing: 0;
+      text-transform: none;
+      color: #9ca3af;
+    }
+    #airport-input:focus { border-color: #7c3aed; }
+
+    #search-btn {
+      padding: 12px 22px;
+      background: #7c3aed;
+      border: none;
+      border-radius: 10px;
+      color: #fff;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, opacity 0.15s;
+      white-space: nowrap;
+    }
+    #search-btn:hover { background: #6d28d9; }
+    #search-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .chips .lbl { font-size: 0.8rem; color: #9ca3af; }
+    .chip {
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      background: #f3f4f6;
+      border: 1px solid #e5e7eb;
+      border-radius: 20px;
+      padding: 3px 12px;
+      cursor: pointer;
+      color: #374151;
+      transition: background 0.15s;
+    }
+    .chip:hover { background: #e5e7eb; }
+
+    /* ── Default state ── */
+    #default-state {
+      text-align: center;
+      padding: 48px 0 24px;
+    }
+    #default-state .big-icon { font-size: 3.5rem; margin-bottom: 16px; }
+    #default-state h1 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: #111827;
+      margin-bottom: 8px;
+    }
+    #default-state p { color: #6b7280; font-size: 0.95rem; }
+
+    /* ── Title ── */
+    #report-title {
+      font-size: 1.9rem;
+      font-weight: 800;
+      color: #111827;
+      text-align: center;
+      margin-bottom: 28px;
+      display: none;
+    }
+
+    /* ── Current Conditions ── */
+    .section-conditions {
+      background: #f0f2f5;
+      border-left: 5px solid #6b48ff;
+      border-radius: 8px;
+      padding: 20px 24px;
+      margin-bottom: 24px;
+    }
+    .section-conditions h2 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #1f2937;
+      margin-bottom: 10px;
+    }
+    .section-conditions p {
+      font-size: 1rem;
+      color: #374151;
+      line-height: 1.65;
+    }
+
+    /* ── Detailed Information ── */
+    .section-details { margin-bottom: 24px; }
+    .section-details h2 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #1f2937;
+      margin-bottom: 14px;
+    }
+    .divider {
+      border: none;
+      border-top: 1px solid #e5e7eb;
+      margin-bottom: 4px;
+    }
+    .detail-row {
+      display: flex;
+      align-items: baseline;
+      padding: 14px 0;
+      border-bottom: 1px solid #f3f4f6;
+      gap: 16px;
+    }
+    .detail-row:last-child { border-bottom: none; }
+    .d-label {
+      font-weight: 700;
+      color: #1f2937;
+      font-size: 0.95rem;
+      min-width: 160px;
+      flex-shrink: 0;
+    }
+    .d-value {
+      color: #4b5563;
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+
+    /* ── Raw METAR ── */
+    .section-raw { }
+    .section-raw h2 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #1f2937;
+      margin-bottom: 10px;
+    }
+    .raw-block {
+      font-family: 'Courier New', monospace;
+      font-size: 0.85rem;
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 14px 16px;
+      color: #4b5563;
+      word-break: break-all;
+      line-height: 1.6;
+    }
+
+    /* ── Error ── */
+    .error-box {
+      background: #fef2f2;
+      border-left: 5px solid #ef4444;
+      border-radius: 8px;
+      padding: 16px 20px;
+      color: #b91c1c;
+      font-size: 0.95rem;
+    }
+
+    /* ── Loading ── */
+    .loading-box {
+      text-align: center;
+      padding: 48px 0;
+      color: #6b7280;
+    }
+    .spinner {
+      width: 34px; height: 34px;
+      border: 3px solid #e5e7eb;
+      border-top-color: #7c3aed;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin: 0 auto 14px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .auto-badge {
+      display: inline-block;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      background: #ede9fe;
+      color: #7c3aed;
+      border-radius: 4px;
+      padding: 2px 7px;
+      margin-left: 10px;
+      vertical-align: middle;
+      position: relative;
+      top: -2px;
+    }
+  </style>
+</head>
+<body>
+<div class="card">
+
+  <div class="search-area">
+    <div class="search-row">
+      <input id="airport-input" type="text" maxlength="4"
+             placeholder="Airport code (e.g. KHIO)">
+      <button id="search-btn" onclick="fetchWeather()">Get Weather</button>
+    </div>
+    <div class="chips">
+      <span class="lbl">Try:</span>
+      <span class="chip" onclick="go('KHIO')">KHIO</span>
+      <span class="chip" onclick="go('KLAX')">KLAX</span>
+      <span class="chip" onclick="go('KJFK')">KJFK</span>
+      <span class="chip" onclick="go('KSFO')">KSFO</span>
+      <span class="chip" onclick="go('KORD')">KORD</span>
+      <span class="chip" onclick="go('EGLL')">EGLL</span>
+      <span class="chip" onclick="go('RJTT')">RJTT</span>
+    </div>
+  </div>
+
+  <div id="default-state">
+    <div class="big-icon">✈️</div>
+    <h1>METAR Weather Reader</h1>
+    <p>Enter an airport code above to get a plain-English weather report.</p>
+  </div>
+
+  <div id="result"></div>
+
+</div>
+
+<script>
+  const input  = document.getElementById('airport-input');
+  const btn    = document.getElementById('search-btn');
+  const result = document.getElementById('result');
+  const dflt   = document.getElementById('default-state');
+
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') fetchWeather(); });
+
+  function go(code) { input.value = code; fetchWeather(); }
+
+  async function fetchWeather() {
+    const airport = input.value.trim().toUpperCase();
+    if (!airport) { showError('Please enter an airport code.'); return; }
+
+    btn.disabled = true;
+    dflt.style.display = 'none';
+    result.innerHTML = `
+      <div class="loading-box">
+        <div class="spinner"></div>
+        <div>Fetching weather for <strong>${esc(airport)}</strong>&hellip;</div>
+      </div>`;
+
+    try {
+      const resp = await fetch(`/weather?airport=${encodeURIComponent(airport)}`);
+      const data = await resp.json();
+      if (!resp.ok || data.error) { showError(data.error || 'Unknown error.'); return; }
+      render(data);
+    } catch {
+      showError('Network error — please try again.');
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function showError(msg) {
+    dflt.style.display = 'none';
+    result.innerHTML = `<div class="error-box">${esc(msg)}</div>`;
+  }
+
+  function render(data) {
+    const auto = data.auto ? '<span class="auto-badge">AUTO</span>' : '';
+
+    // Sky conditions joined as plain text
+    const skyText = (data.clouds || []).join(', ') || null;
+
+    // Build detail rows
+    const rows = [
+      ['Observation Time', data.time],
+      ['Wind',             data.wind ? data.wind + (data.wind_variable ? ', ' + data.wind_variable : '') : null],
+      ['Visibility',       data.visibility],
+      ['Sky Conditions',   skyText],
+      data.weather && data.weather.length ? ['Present Weather', data.weather.join(', ')] : null,
+      ['Temperature',      data.temperature_f != null ? `${data.temperature_f}°F (${data.temperature_c}°C)` : null],
+      ['Dewpoint',         data.dewpoint_f    != null ? `${data.dewpoint_f}°F (${data.dewpoint_c}°C)`   : null],
+      ['Barometric Pressure', data.altimeter],
+    ].filter(r => r && r[1]);
+
+    const rowsHtml = rows.map(([label, value]) => `
+      <div class="detail-row">
+        <div class="d-label">${esc(label)}:</div>
+        <div class="d-value">${esc(value)}</div>
+      </div>`).join('');
+
+    result.innerHTML = `
+      <div id="report-title" style="display:block;">
+        Weather Report for ${esc(data.station || '—')}${auto}
+      </div>
+
+      <div class="section-conditions">
+        <h2>Current Conditions</h2>
+        <p>${esc(data.summary || '')}</p>
+      </div>
+
+      <div class="section-details">
+        <h2>Detailed Information</h2>
+        <hr class="divider">
+        ${rowsHtml}
+      </div>
+
+      <div class="section-raw">
+        <h2>Raw METAR</h2>
+        <div class="raw-block">${esc(data.raw || '')}</div>
+      </div>
+    `;
+  }
+
+  function esc(s) {
+    if (s == null) return '';
+    return String(s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+</script>
+</body>
+</html>
