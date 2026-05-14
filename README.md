@@ -58,13 +58,40 @@ python app.py
 
 Then open [http://127.0.0.1:5000](http://127.0.0.1:5000) in your browser.
 
-## Production deployment
+## Running with Docker
 
-The built-in Flask server is for development only. For a public deployment use a production WSGI server:
+The easiest way to run the app anywhere Docker is available.
+
+**Using Docker Compose (recommended):**
 
 ```bash
-pip install gunicorn
-gunicorn app:app
+docker compose up --build
+```
+
+Then open [http://localhost:5000](http://localhost:5000).
+
+To run in the background:
+
+```bash
+docker compose up --build -d
+docker compose down   # stop
+```
+
+**Using Docker directly:**
+
+```bash
+docker build -t metar-reader .
+docker run -p 5000:5000 metar-reader
+```
+
+## Production deployment
+
+The built-in Flask development server is for local use only. The Docker image uses **gunicorn** as the WSGI server automatically, making it production-ready out of the box.
+
+For non-Docker deployments:
+
+```bash
+gunicorn --bind 0.0.0.0:5000 --workers 2 app:app
 ```
 
 Or deploy to any platform that supports Python web apps (Railway, Render, Fly.io, Heroku, etc.).
@@ -76,6 +103,8 @@ metar-reader/
 ├── app.py              # Flask routes and API endpoint
 ├── metar_decoder.py    # METAR parsing and plain-English translation
 ├── requirements.txt    # Python dependencies
+├── Dockerfile          # Container image definition
+├── docker-compose.yml  # Compose config for one-command startup
 └── templates/
     └── index.html      # Single-page frontend
 ```
