@@ -58,6 +58,18 @@ python app.py
 
 Then open [http://127.0.0.1:5000](http://127.0.0.1:5000) in your browser.
 
+## Running tests
+
+Install dev dependencies (includes pytest) and run the suite:
+
+```bash
+pip install -r requirements-dev.txt
+pytest tests/ -v
+```
+
+- `tests/test_decoder.py` — unit tests for METAR parsing logic using hardcoded mock METAR strings
+- `tests/test_app.py` — Flask route tests covering input validation, successful decodes, and error handling (API call is mocked)
+
 ## Running with Docker
 
 The easiest way to run the app anywhere Docker is available.
